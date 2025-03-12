@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<style>
+			body {
+				margin: 0;
+				overflow: hidden;
+				background-color: #ffffff;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				height: 100vh;
+			}
+
+			canvas {
+				border: 2px solid #90caf9;
+				position: absolute;
+				cursor: pointer;
+			}
+		</style>
+		<title>Bezier Curve Demo</title>
+	</head>
+	<body>
+		<canvas id="bezierCanvas"></canvas>
+
+		<script>
+			const canvas = document.getElementById("bezierCanvas");
+			const ctx = canvas.getContext("2d");
+
+			canvas.width = window.innerWidth;
+			canvas.height = window.innerHeight;
+
+			const points = [
+				{ x: 100, y: 300 },
+				{ x: 300, y: 100 },
+				{ x: 500, y: 300 },
+				{ x: 700, y: 100 },
+			];
+
+			function drawCurve() {
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				ctx.setLineDash([5, 5]);
+				ctx.strokeStyle = "#90caf9";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(points[0].x, points[0].y);
+				ctx.lineTo(points[1].x, points[1].y);
+				ctx.moveTo(points[1].x, points[1].y);
+				ctx.lineTo(points[2].x, points[2].y);
+				ctx.moveTo(points[2].x, points[2].y);
+				ctx.lineTo(points[3].x, points[3].y);
+				ctx.stroke();
+
+				ctx.setLineDash([]);
+				ctx.strokeStyle = "#90caf9";
+				ctx.lineWidth = 4;
+				ctx.beginPath();
+				ctx.moveTo(points[0].x, points[0].y);
+				ctx.bezierCurveTo(
+					points[1].x,
+					points[1].y,
+					points[2].x,
+					points[2].y,
+					points[3].x,
+					points[3].y
+				);
+				ctx.stroke();
+
+				const tangent = getTangent();
+				ctx.strokeStyle = "#90caf9";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(tangent[0].x, tangent[0].y);
+				ctx.lineTo(tangent[1][0].x, tangent[1][0].y);
+				ctx.moveTo(tangent[0].x, tangent[0].y);
+				ctx.lineTo(tangent[1][1].x, tangent[1][1].y);
+				ctx.stroke();
+
+				ctx.fillStyle = "#2196f3";
+				points.forEach((point) => {
+					ctx.beginPath();
+					ctx.arc(point.x, point.y, 10, 0, Math.PI * 2);
+					ctx.fill();
+				});
+			}
+
+			function easeInOutSine(t) {
+				return 0.5 * (1 - Math.cos(Math.PI * t));
+			}
+
+			function getTangent() {
+				let t = (Date.now() % 4000) / 2000;
+
+				t = t % 2;
+
+				if (t > 1) {
+					t = 2 - t;
+				}
+
+				t = easeInOutSine(t);
+
+				const x = calculateBezierPoint(
+					t,
+					points[0].x,
+					points[1].x,
+					points[2].x,
+					points[3].x
+				);
+				const y = calculateBezierPoint(
+					t,
+					points[0].y,
+					points[1].y,
+					points[2].y,
+					points[3].y
+				);
+				const slope = calculateSlope(t);
+
+				const tangentStart = { x, y };
+
+				const tangentVector = { x: 1, y: slope };
+				const magnitude = Math.sqrt(
+					tangentVector.x ** 2 + tangentVector.y ** 2
+				);
+				tangentVector.x /= magnitude;
+				tangentVector.y /= magnitude;
+
+				const tangentLength = 200;
+				const tangentEnd = [
+					{
+						x: x + tangentLength * tangentVector.x,
+						y: y + tangentLength * tangentVector.y,
+					},
+					{
+						x: x - tangentLength * tangentVector.x,
+						y: y - tangentLength * tangentVector.y,
+					},
+				];
+
+				return [tangentStart, tangentEnd];
+			}
+
+			function calculateBezierPoint(t, p0, p1, p2, p3) {
+				return (
+					Math.pow(1 - t, 3) * p0 +
+					3 * Math.pow(1 - t, 2) * t * p1 +
+					3 * (1 - t) * Math.pow(t, 2) * p2 +
+					Math.pow(t, 3) * p3
+				);
+			}
+			function calculateSlope(t) {
+				const dx =
+					3 * (1 - t) ** 2 * (points[1].x - points[0].x) +
+					6 * (1 - t) * t * (points[2].x - points[1].x) +
+					3 * t ** 2 * (points[3].x - points[2].x);
+
+				const dy =
+					3 * (1 - t) ** 2 * (points[1].y - points[0].y) +
+					6 * (1 - t) * t * (points[2].y - points[1].y) +
+					3 * t ** 2 * (points[3].y - points[2].y);
+
+				return dy / dx;
+			}
+
+			function moveTangent() {
+				drawCurve();
+				requestAnimationFrame(moveTangent);
+			}
+
+			moveTangent();
+
+			let selectedPoint = null;
+
+			canvas.addEventListener("mousedown", (e) => {
+				const mouseX = e.clientX;
+				const mouseY = e.clientY;
+
+				selectedPoint = points.find((point) => {
+					const distance = Math.sqrt(
+						(point.x - mouseX) ** 2 + (point.y - mouseY) ** 2
+					);
+					return distance < 10;
+				});
+			});
+
+			canvas.addEventListener("mousemove", (e) => {
+				if (selectedPoint) {
+					selectedPoint.x = e.clientX;
+					selectedPoint.y = e.clientY;
+				}
+			});
+
+			canvas.addEventListener("mouseup", () => {
+				selectedPoint = null;
+			});
+
+			window.addEventListener("resize", () => {
+				canvas.width = window.innerWidth;
+				canvas.height = window.innerHeight;
+				drawCurve();
+			});
+		</script>
+	</body>
+</html>
